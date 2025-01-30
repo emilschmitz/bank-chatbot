@@ -17,7 +17,7 @@ os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_PROJECT"] = "sparkasse-rag"
 load_dotenv('secrets.env')
 
-def get_relevant_documents(query: str, top_k: int = 5):
+def get_relevant_documents(query: str, top_k: int = 3):
     """Get relevant documents using Redis vector search"""
     client = redis.Redis(host='localhost', port=6379, decode_responses=True)
     embeddings = OllamaEmbeddings(model="nomic-embed-text", base_url="http://localhost:11434")
@@ -48,12 +48,12 @@ def create_rag_chain():
         ])
     
     prompt = """
-    You are an assistant for the Sparkasse bank and answer questions. Use the context below to answer accurately.
-    If you don't know, say so. Always cite your sources with document names and links.
+    Sie sind ein Assistent der Sparkasse und beantworten Fragen. Nutzen Sie den untenstehenden Kontext für genaue Antworten.
+    Wenn Sie etwas nicht wissen, sagen Sie es offen. Nennen Sie immer den Dokumentnamen und Link, aus dem Sie die Information haben.
 
-    Question: {question}
-    Context: {context}
-    Answer: 
+    Frage: {question}
+    Kontext: {context}
+    Antwort: 
     """
     
     model = ChatOllama(model="llama3.2:1b", base_url="http://localhost:11434")
@@ -95,19 +95,6 @@ def interactive_mode(rag_chain):
             break
         except Exception as e:
             print(f"\n❌ Error: {str(e)}\n")
-
-def test_search(query: str):
-    """Test Redis vector search"""
-    print(f"\n🔍 Testing search for: '{query}'")
-    results = get_relevant_documents(query)
-    
-    print(f"\nFound {len(results)} matches:")
-    for i, doc in enumerate(results, 1):
-        print(f"\n{i}. Score: {doc.score}")
-        print(f"Title: {doc.title}")
-        # print(f"URL: {doc.url}")
-        # print(f"Content: {doc.text[:200]}...")
-        # print("-" * 60)
 
 if __name__ == "__main__":
     # Start chat
