@@ -3,7 +3,7 @@ import redis
 import requests
 import logging
 from pathlib import Path
-from markitdown import MarkItDown
+from markitdown import MarkItDown # type: ignore
 from redis.commands.search.field import VectorField, TextField
 from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 from langchain_ollama import OllamaEmbeddings
