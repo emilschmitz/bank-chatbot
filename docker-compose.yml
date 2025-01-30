@@ -25,6 +25,12 @@ services:
     ports:
       - "6379:6379"
       - "8001:8001"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 360
+      start_period: 30s
   llm_rag:
     depends_on:
       ollama:
@@ -35,5 +41,6 @@ services:
     container_name: llm_rag
     volumes:
       - ./docs:/app/docs
+      - ./secrets.env:/app/secrets.env
     ports:
       - "8000:8000"
