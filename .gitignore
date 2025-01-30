@@ -40,3 +40,4 @@ downloads/
 *.log
 redis-data/
 ollama/ollama/
+secrets.env
