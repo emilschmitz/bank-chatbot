@@ -1,0 +1,39 @@
+version: '3'
+services:
+  ollama:
+    image: ollama/ollama
+    ports:
+        - 11434:11434
+    volumes:
+        - ./ollama/ollama:/root/.ollama
+        - ./ollama/scripts/entrypoint.sh:/entrypoint.sh
+    container_name: ollama
+    pull_policy: always
+    tty: true
+    restart: always
+    stdin_open: true
+    healthcheck:
+      test: ["CMD", "test", "-f", "/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 360  # 60 minutes = 360 * 10s
+      start_period: 30s
+    entrypoint: ["/usr/bin/bash", "/entrypoint.sh"]
+  redis:
+    image: redis/redis-stack
+    container_name: redis
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+  llm_rag:
+    depends_on:
+      ollama:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    build: ./rag_service
+    container_name: llm_rag
+    volumes:
+      - ./docs:/app/docs
+    ports:
+      - "8000:8000"
