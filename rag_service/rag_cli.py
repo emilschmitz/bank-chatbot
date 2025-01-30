@@ -1,124 +1,115 @@
 import os
-import json
 import warnings
-import requests
-from pathlib import Path
+import redis
+import numpy as np
 from dotenv import load_dotenv
 from langchain_ollama import OllamaEmbeddings, ChatOllama
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.docstore.document import Document
-from langchain.vectorstores.redis import Redis as RedisVectorStore
-from langchain.schema import Document as LC_Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
-import redis
+from langchain.callbacks.tracers import LangChainTracer
+from redis.commands.search.query import Query
 
 load_dotenv()
 warnings.filterwarnings("ignore")
 
-# -------------------------------------------------------------------
-# 1. Load JSON with document titles/URLs
-# -------------------------------------------------------------------
-JSON_FILE = "docs/documents_sk_ostprignitz.json"
-with open(JSON_FILE, "r", encoding="utf-8") as f:
-    docs_dict = json.load(f)
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_PROJECT"] = "sparkasse-rag"
+load_dotenv('secrets.env')
 
-# -------------------------------------------------------------------
-# 2. Download and convert docs to text
-#    (Replace with your actual PDF->text or docling logic)
-# -------------------------------------------------------------------
-def fetch_document_as_text(title, url, download_dir="downloads"):
-    dl_dir = Path(download_dir)
-    dl_dir.mkdir(exist_ok=True)
-    local_file = dl_dir / f"{title}.pdf"  # or .xls etc. as needed
-
-    # Download if not exists
-    if not local_file.exists():
-        resp = requests.get(url)
-        with open(local_file, "wb") as wf:
-            wf.write(resp.content)
-    
-    # TODO: Convert PDF/Excel/etc. to text. Here: a dummy placeholder
-    text_data = f"Dummy text for {title}, originally downloaded from {url}"
-    return text_data
-
-# -------------------------------------------------------------------
-# 3. Chunk text for vector storage
-# -------------------------------------------------------------------
-def create_chunks(title, url, text, chunk_size=1000, chunk_overlap=100):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-    return [Document(page_content=f"Dokumentname: {title}\n\n Link: {url} \n\n Textstueck: {chunk}") for chunk in splitter.split_text(text)]
-
-# -------------------------------------------------------------------
-# 4. Create embeddings and store in Redis
-# -------------------------------------------------------------------
-def store_docs_in_redis(all_docs):
+def get_relevant_documents(query: str, top_k: int = 5):
+    """Get relevant documents using Redis vector search"""
+    client = redis.Redis(host='localhost', port=6379, decode_responses=True)
     embeddings = OllamaEmbeddings(model="nomic-embed-text", base_url="http://localhost:11434")
-    redis_store = RedisVectorStore.from_documents(
-        documents=all_docs,
-        embedding=embeddings,
-        redis_url="redis://localhost:6379",
-        index_name="sparkasse_index",  # name your index
-    )
-    return redis_store
+    
+    # Create query embedding
+    query_embedding = embeddings.embed_query(query)
+    query_vector = np.array(query_embedding).astype(np.float32).tobytes()
+    
+    # Search Redis
+    q = (Query(f"*=>[KNN {top_k} @embedding $vec as score]")
+         .sort_by("score")
+         .return_fields("text", "title", "url", "score")
+         .dialect(2))
+    
+    results = client.ft("docs").search(q, {"vec": query_vector}).docs
+    return results
 
-# -------------------------------------------------------------------
-# 5. Simple RAG chain
-# -------------------------------------------------------------------
-def create_rag_chain(retriever):
+def create_rag_chain():
+    tracer = LangChainTracer(project_name="sparkasse-rag")
+
+    def get_context(query):
+        docs = get_relevant_documents(query)
+        return "\n\n".join([
+            f"Dokumentname: {doc.title}\n"
+            f"Link: {doc.url}\n"
+            f"Inhalt: {doc.text}"
+            for doc in docs
+        ])
+    
     prompt = """
-    Du bist ein Assistent für die Sparkasse und beantwortest Fragen. Nutze den untenstehenden Kontext, um genau zu antworten.
-    Wenn du es nicht weißt, sag es. Antworte in Stichpunkten. Benenne immer deine Quellen mit Dokumentnamen und Link, z.B. 'Lesen Sie mehr zum Them in..."
+    You are an assistant for the Sparkasse bank and answer questions. Use the context below to answer accurately.
+    If you don't know, say so. Always cite your sources with document names and links.
 
-    Frage: {question}
-    Kontext: {context}
-    Antwort:
+    Question: {question}
+    Context: {context}
+    Answer: 
     """
-    # Use DeepSeek locally via Ollama
-    model = ChatOllama(model="deepseek-r1:1.5b", base_url="http://localhost:11434")
+    
+    model = ChatOllama(model="llama3.2:1b", base_url="http://localhost:11434")
     template = ChatPromptTemplate.from_template(prompt)
-    # For RAG streaming
-    chain = (
+    
+    return (
         {
-            "context": retriever | (lambda docs: "\n\n".join([d.page_content for d in docs])),
+            "context": get_context,
             "question": RunnablePassthrough()
         }
         | template
         | model
         | StrOutputParser()
-    )
-    return chain
+    ).with_config(callbacks=[tracer])
 
-# -------------------------------------------------------------------
-# MAIN
-# -------------------------------------------------------------------
-if __name__ == "__main__":
-    # 1) Download + convert all docs to text, chunk them
-    all_chunks = []
-    for title, url in docs_dict.items():
-        text_data = fetch_document_as_text(title, url)
-        doc_chunks = create_chunks(text_data)
-        # Make sure each chunk is annotated
-        for i, c in enumerate(doc_chunks):
-            c.metadata["source"] = title
-            c.metadata["chunk_idx"] = i
-        all_chunks.extend(doc_chunks)
+def interactive_mode(rag_chain):
+    print("\n" + "=" * 60)
+    print("🏦 Willkommen bei Ihrem Sparkassen-Assistenten!")
+    print("Ich kann Ihnen Fragen zu Sparkassen-Dokumenten beantworten.")
+    print("Sie können jederzeit 'exit' eingeben, um zu beenden.")
+    print("=" * 60 + "\n")
     
-    # 2) Store everything in Redis
-    redis_store = store_docs_in_redis(all_chunks)
-    retriever = redis_store.as_retriever(search_type="similarity", search_kwargs={"k": 3})
+    while True:
+        try:
+            question = input("➤ ").strip()
+            if question.lower() in ['exit', 'quit', 'q']:
+                print("\nAuf Wiedersehen! 👋")
+                break
+            if not question:
+                continue
+                
+            print("\n", end="", flush=True)
+            for token in rag_chain.stream(question):
+                print(token, end="", flush=True)
+            print("\n\n" + "-" * 60 + "\n")
+            
+        except KeyboardInterrupt:
+            print("\nAuf Wiedersehen! 👋")
+            break
+        except Exception as e:
+            print(f"\n❌ Error: {str(e)}\n")
 
-    # 3) Build RAG chain
-    rag_chain = create_rag_chain(retriever)
+def test_search(query: str):
+    """Test Redis vector search"""
+    print(f"\n🔍 Testing search for: '{query}'")
+    results = get_relevant_documents(query)
+    
+    print(f"\nFound {len(results)} matches:")
+    for i, doc in enumerate(results, 1):
+        print(f"\n{i}. Score: {doc.score}")
+        print(f"Title: {doc.title}")
+        # print(f"URL: {doc.url}")
+        # print(f"Content: {doc.text[:200]}...")
+        # print("-" * 60)
 
-    # 4) Demo Q&A
-    questions = [
-        "Was steht in der Existenzgründerbroschüre?",
-        "Worum geht es in der Selbstauskunft?"
-    ]
-    for q in questions:
-        print(f"\nQuestion: {q}")
-        for token in rag_chain.stream(q):
-            print(token, end="", flush=True)
-        print("\n" + "-" * 40)
+if __name__ == "__main__":
+    # Start chat
+    rag_chain = create_rag_chain()
+    interactive_mode(rag_chain)
