@@ -14,7 +14,7 @@ echo "🔄 Pulling required models..."
 mkdir -p /health
 
 # Pull both models in sequence
-ollama pull deepseek-r1:1.5b && \
+ollama pull llama3.2:1b && \
 ollama pull nomic-embed-text && \
 touch /health/ready
 
