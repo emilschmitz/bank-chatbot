@@ -1,12 +1,16 @@
-# Bank Chatbot
+# RAG Bank Chatbot
 
 A chatbot designed to assist with Sparkassen documents using Redis and Ollama for efficient data retrieval and language processing.
 
 ## Features
 
+  ⚠️ **Note that this chatbot is a prototype and says a lot of nonsensical things. That's maybe because we use a rather small model, for it to run locally on a laptop.**
+
+Nonetheless, it has all the following features:
+
 - **Document Ingestion:** Automatically downloads, converts, and indexes Sparkassen documents.
 - **Vector Search:** Utilizes Redis for fast and relevant document retrieval based on user queries.
-- **Interactive Chat:** Engages users in natural language conversations, providing precise answers using the indexed documents.
+- **Interactive Chat:** Engages users in natural language conversations.
 - **Dockerized Setup:** Easily deployable using Docker Compose for seamless environment management.
 
 ## Prerequisites
@@ -30,13 +34,14 @@ A chatbot designed to assist with Sparkassen documents using Redis and Ollama fo
    ```bash
    docker compose run -it llm_rag
    ```
+      ⚠️ **It may take some time for this command to finish, without there being a whole lot of console logging**
 
    This command will:
 
    - Build the necessary Docker images.
    - Start the Ollama and Redis services.
-   - Download the Llama3.2:1b from Ollama
-   - Ingest Sparkasse documents
+   - Download the Llama3.2:1b from Ollama.
+   - Ingest Sparkasse documents into Redis.
    - Launch the chatbot in interactive mode.
 
 ## Usage
