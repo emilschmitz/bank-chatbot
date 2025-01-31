@@ -61,8 +61,7 @@ def create_rag_chain():
     
     ANTWORT: 
     """
-    
-    model = ChatOllama(model="llama3.2:1b", base_url="http://localhost:11434")
+    model = ChatOllama(model="llama3.2:1b", base_url=f"http://{ollama_host}:11434")
     template = ChatPromptTemplate.from_template(prompt)
     
     return (
