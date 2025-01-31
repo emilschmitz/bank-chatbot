@@ -34,7 +34,7 @@ Nonetheless, it has all the following features:
    ```bash
    docker compose run -it llm_rag
    ```
-      ⚠️ **It may take some time for this command to finish, without there being a whole lot of console logging**
+      ⚠️ **It may take some time for this command to finish, without there being a whole lot of console logging**.
 
    This command will:
 
@@ -43,6 +43,10 @@ Nonetheless, it has all the following features:
    - Download the Llama3.2:1b from Ollama.
    - Ingest Sparkasse documents into Redis.
    - Launch the chatbot in interactive mode.
+  
+3. **(Optional) Langsmith tracking**:
+
+   If you want to use Langsmith to track your conversations, add a file named `secrets.env` to the base directory and enter `LANGCHAIN_API_KEY=<your-key>`.
 
 ## Usage
 
