@@ -1,4 +1,5 @@
 import json
+import os
 import redis
 import requests
 import logging
@@ -9,6 +10,9 @@ from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 from langchain_ollama import OllamaEmbeddings
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 
+ollama_host = os.getenv("OLLAMA_HOST", "localhost")  
+redis_host = os.getenv("REDIS_HOST", "localhost")
+
 # Set up basic logging
 logging.basicConfig(
     level=logging.INFO,
@@ -17,11 +21,11 @@ logging.basicConfig(
 )
 
 # Initialize Redis connection
-redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
+redis_client = redis.Redis(host=redis_host, port=6379, decode_responses=True)
 
 # Initialize embeddings
-embeddings = OllamaEmbeddings(model='nomic-embed-text', base_url="http://localhost:11434")
-VECTOR_DIM = embeddings.aembed_query('This is just to get embedding length') # Dimension of embeddings
+embeddings = OllamaEmbeddings(model='nomic-embed-text', base_url=f"http://{ollama_host}:11434")
+VECTOR_DIM = len(embeddings.embed_query('This is just to get embedding length')) # Dimension of embeddings
 
 class DocumentProcessor:
     def __init__(self, download_dir="./docs/downloads"):
@@ -66,10 +70,6 @@ def create_index():
         redis_client.ft('docs').dropindex(delete_documents=True)  # Clear old data
     except:
         pass
-
-    # Get vector dimension from embeddings
-    test_emb = embeddings.embed_query("test")
-    VECTOR_DIM = len(test_emb)
 
     schema = (
         TextField("$.text", as_name="text"),  # Add back $. prefix

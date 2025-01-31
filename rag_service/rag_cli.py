@@ -10,6 +10,9 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain.callbacks.tracers import LangChainTracer
 from redis.commands.search.query import Query
 
+ollama_host = os.getenv("OLLAMA_HOST", "localhost")
+redis_host = os.getenv("REDIS_HOST", "localhost")
+
 load_dotenv()
 warnings.filterwarnings("ignore")
 
@@ -19,8 +22,8 @@ load_dotenv('secrets.env')
 
 def get_relevant_documents(query: str, top_k: int = 3):
     """Get relevant documents using Redis vector search"""
-    client = redis.Redis(host='localhost', port=6379, decode_responses=True)
-    embeddings = OllamaEmbeddings(model="nomic-embed-text", base_url="http://localhost:11434")
+    client = redis.Redis(host=redis_host, port=6379, decode_responses=True)
+    embeddings = OllamaEmbeddings(model="nomic-embed-text", base_url=f"http://{ollama_host}:11434")
     
     # Create query embedding
     query_embedding = embeddings.embed_query(query)
@@ -48,12 +51,15 @@ def create_rag_chain():
         ])
     
     prompt = """
-    Sie sind ein Assistent der Sparkasse und beantworten Fragen. Nutzen Sie den untenstehenden Kontext für genaue Antworten.
+    Sie sind ein Assistent der Sparkasse und beantworten Fragen mithilfe von Dokumenten der Sparkasse, die Sie als Kontext erhalten. Nutzen Sie den Kontext für genaue Antworten.
     Wenn Sie etwas nicht wissen, sagen Sie es offen. Nennen Sie immer den Dokumentnamen und Link, aus dem Sie die Information haben.
+    Antworten Sie in Plaintext, nicht Markdown.
 
-    Frage: {question}
-    Kontext: {context}
-    Antwort: 
+    FRAGE: {question}
+    
+    KONTEXT: {context}
+    
+    ANTWORT: 
     """
     
     model = ChatOllama(model="llama3.2:1b", base_url="http://localhost:11434")

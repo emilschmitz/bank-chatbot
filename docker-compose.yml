@@ -1,4 +1,3 @@
-version: '3'
 services:
   ollama:
     image: ollama/ollama
@@ -9,9 +8,7 @@ services:
         - ./ollama/scripts/entrypoint.sh:/entrypoint.sh
     container_name: ollama
     pull_policy: always
-    tty: true
     restart: always
-    stdin_open: true
     healthcheck:
       test: ["CMD", "test", "-f", "/health/ready"]
       interval: 10s
@@ -44,3 +41,10 @@ services:
       - ./secrets.env:/app/secrets.env
     ports:
       - "8000:8000"
+    tty: true
+    stdin_open: true
+    # entrypoint: ["bash"]
+    entrypoint: ["sh", "entrypoint.sh"]
+    environment:
+      - REDIS_HOST=redis
+      - OLLAMA_HOST=ollama

@@ -7,6 +7,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
-
-CMD ["python", "rag_cli.py"]
+COPY . ./rag_service
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh

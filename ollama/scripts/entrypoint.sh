@@ -15,7 +15,10 @@ mkdir -p /health
 
 # Pull both models in sequence
 ollama pull llama3.2:1b && \
-ollama pull nomic-embed-text && \
+ollama pull nomic-embed-text
+
+sleep 10  # Sleep for ten seconds to allow models to download
+
 touch /health/ready
 
 echo "✅ Models ready!"
