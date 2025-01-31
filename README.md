@@ -1,6 +1,6 @@
 # Sparkassen Chatbot
 
-A powerful chatbot designed to assist with Sparkassen documents using Redis and Ollama for efficient data retrieval and language processing.
+A chatbot designed to assist with Sparkassen documents using Redis and Ollama for efficient data retrieval and language processing.
 
 ## Features
 
